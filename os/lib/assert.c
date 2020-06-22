@@ -27,7 +27,6 @@
  * SUCH DAMAGE. 
  *
  */
-#include "lib/assert.h"
 
 #include <stdio.h>
 
@@ -35,10 +34,8 @@ void
 _xassert(const char *file, int lineno)
 {
   printf("Assertion failed: file %s, line %d.\n", file, lineno);
-
-#if !ASSERT_RETURNS
-  printf("The firmware will stop running\n");
-  printf("A watchdog timer may restart this device\n");
-  while(1);
-#endif
+  /*
+   * loop for a while;
+   * call _reset_vector__();
+   */
 }

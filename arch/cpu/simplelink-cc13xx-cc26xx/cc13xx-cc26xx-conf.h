@@ -62,6 +62,15 @@
 #endif
 /*---------------------------------------------------------------------------*/
 /**
+ * \name GPIO HAL configuration.
+ *
+ * @{
+ */
+#define GPIO_HAL_CONF_ARCH_SW_TOGGLE        0
+#define GPIO_HAL_CONF_ARCH_HDR_PATH         "dev/gpio-hal-arch.h"
+/** @} */
+/*---------------------------------------------------------------------------*/
+/**
  * \name Watchdog Configuration.
  *
  * @{
@@ -70,8 +79,8 @@
 #define WATCHDOG_CONF_DISABLE               0
 #endif
 
-#ifndef WATCHDOG_CONF_TIMEOUT_MS
-#define WATCHDOG_CONF_TIMEOUT_MS            1000
+#ifndef WATCHDOG_CONF_TIMER_TOP
+#define WATCHDOG_CONF_TIMER_TOP             0xFFFFF
 #endif
 /** @} */
 /*---------------------------------------------------------------------------*/
@@ -91,19 +100,15 @@
 #endif
 
 /*
- * Configure the TX power for the netstack, specified in dBm. Defaults to
- * maximum available TX power setting for the specific PHY.
+ * Configure TX power to either default PA or High PA, defaults to
+ * default PA.
  */
-#ifndef RF_CONF_TXPOWER_DBM
-#define RF_CONF_TXPOWER_DBM             RF_TXPOWER_MAX_DBM
+#ifndef RF_CONF_TXPOWER_HIGH_PA
+#define RF_CONF_TXPOWER_HIGH_PA         0
 #endif
 
-/*
- * Configure the TX power for the BLE beacon, specified in dBm.
- * Defaults to maximum available TX power setting for the specific PHY.
- */
-#ifndef RF_CONF_BLE_TXPOWER_DBM
-#define RF_CONF_BLE_TXPOWER_DBM         RF_TXPOWER_MAX_DBM
+#if (RF_CONF_TXPOWER_HIGH_PA) && !(SUPPORTS_HIGH_PA)
+#error "Device does not support High PA"
 #endif
 
 /*
@@ -161,7 +166,7 @@
 
 /* Size of each RX buffer in bytes. */
 #ifndef RF_CONF_RX_BUF_SIZE
-#define RF_CONF_RX_BUF_SIZE          146
+#define RF_CONF_RX_BUF_SIZE          144
 #endif
 
 /* Enable/disable BLE beacon. */
@@ -238,6 +243,7 @@
 #else
 #error "Unsupported Device Line defined"
 #endif /* Unsupported device line */
+
 /** @} */
 /*---------------------------------------------------------------------------*/
 /**

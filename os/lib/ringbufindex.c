@@ -110,7 +110,7 @@ ringbufindex_get(struct ringbufindex *r)
   }
 }
 /* Return the index of the first element
- * (which will be removed if calling ringbufindex_get) */
+ * (which will be removed if calling ringbufindex_peek) */
 int
 ringbufindex_peek_get(const struct ringbufindex *r)
 {

@@ -9,11 +9,9 @@ JN516x_WITH_DR1199 = 1
 CONTIKI=../../../../..
 
 MAKE_MAC = MAKE_MAC_TSCH
-
-include $(CONTIKI)/Makefile.dir-variables
-MODULES += $(CONTIKI_NG_LIB_DIR)/json
-MODULES += $(CONTIKI_NG_APP_LAYER_DIR)/coap
-
+MODULES += os/lib/json
 MODULES_REL += ..
+
+MODULES += os/net/app-layer/coap
 
 include $(CONTIKI)/Makefile.include

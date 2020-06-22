@@ -56,6 +56,7 @@ struct tsch_slotframe_and_links_link {
   uint16_t timeslot;
   uint16_t channel_offset;
   uint8_t link_options;
+  uint8_t nodeid;
 };
 struct tsch_slotframe_and_links {
   uint8_t num_slotframes; /* We support only 0 or 1 slotframe in this IE */

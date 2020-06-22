@@ -61,7 +61,6 @@ static const sixtop_sf_t test_sf1 = {
   0,
   test_sf1_init,
   NULL,
-  NULL,
   NULL
 };
 
@@ -70,7 +69,6 @@ static const sixtop_sf_t test_sf2 = {
   0,
   test_sf2_init,
   NULL,
-  NULL,
   NULL
 };
 
@@ -78,7 +76,6 @@ static const sixtop_sf_t test_sf3 = {
   TEST_SF3_SFID,
   0,
   test_sf3_init,
-  NULL,
   NULL,
   NULL
 };

@@ -41,7 +41,7 @@ static char data_received[HTTP_CLIENT_BUFFER_LEN];
 static int bytes_received = 0;
 static int restarts;
 static struct ctimer reconnect_timer;
-static const char *url = "http://httpbin.org/ip";
+static const char *url = "http://localhost:8000";
 /*---------------------------------------------------------------------------*/
 static void callback(struct http_socket *s, void *ptr,
                      http_socket_event_t e,

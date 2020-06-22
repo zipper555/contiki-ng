@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2006, Swedish Institute of Computer Science.
- * Copyright (c) 2019, George Oikonomou - http://www.spd.gr
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,26 +27,28 @@
  * SUCH DAMAGE.
  *
  */
-/*-----------------------------------------------------------------------------------*/
+
 #include "dev/leds.h"
 #include "lib/simEnvChange.h"
-/*-----------------------------------------------------------------------------------*/
-/* Variables required by the Cooja button interface */
-leds_mask_t simLedsValue = 0;
+
 const struct simInterface leds_interface;
-/*-----------------------------------------------------------------------------------*/
-static void
-led_change_cb(void)
-{
-  simLedsValue = leds_get();
-}
+
+// COOJA variables
+leds_mask_t simLedsValue;
+
 /*-----------------------------------------------------------------------------------*/
 void leds_arch_init() {
   simLedsValue = 0;
-
-  gpio_hal_arch_register_pin_callback(COOJA_LED_GREEN_PIN, led_change_cb);
-  gpio_hal_arch_register_pin_callback(COOJA_LED_RED_PIN, led_change_cb);
-  gpio_hal_arch_register_pin_callback(COOJA_LED_YELLOW_PIN, led_change_cb);
+}
+/*-----------------------------------------------------------------------------------*/
+leds_mask_t leds_arch_get() {
+  return simLedsValue;
+}
+/*-----------------------------------------------------------------------------------*/
+void leds_arch_set(leds_mask_t leds) {
+  if(leds != simLedsValue) {
+    simLedsValue = leds;
+  }
 }
 /*-----------------------------------------------------------------------------------*/
 static void
@@ -60,22 +61,7 @@ doInterfaceActionsAfterTick(void)
 {
 }
 /*-----------------------------------------------------------------------------------*/
+
 SIM_INTERFACE(leds_interface,
-              doInterfaceActionsBeforeTick,
-              doInterfaceActionsAfterTick);
-/*---------------------------------------------------------------------------*/
-const leds_t leds_arch_leds[] = {
-  {
-    .pin = COOJA_LED_GREEN_PIN,
-    .negative_logic = false
-  },
-  {
-    .pin = COOJA_LED_RED_PIN,
-    .negative_logic = false
-  },
-  {
-    .pin = COOJA_LED_YELLOW_PIN,
-    .negative_logic = false
-  },
-};
-/*---------------------------------------------------------------------------*/
+	      doInterfaceActionsBeforeTick,
+	      doInterfaceActionsAfterTick);

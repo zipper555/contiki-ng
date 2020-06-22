@@ -101,11 +101,9 @@ rpl_link_callback(const linkaddr_t *addr, int status, int numtx)
     if(nbr != NULL) {
       /* If this is the neighbor we were probing urgently, mark urgent
       probing as done */
-#if RPL_WITH_PROBING
       if(curr_instance.dag.urgent_probing_target == nbr) {
         curr_instance.dag.urgent_probing_target = NULL;
       }
-#endif
       /* Link stats were updated, and we need to update our internal state.
       Updating from here is unsafe; postpone */
       LOG_INFO("packet sent to ");
@@ -163,7 +161,7 @@ rpl_set_prefix_from_addr(uip_ipaddr_t *addr, unsigned len, uint8_t flags)
   }
 
   /* Try and initialize prefix */
-  memset(&curr_instance.dag.prefix_info.prefix, 0, sizeof(uip_ipaddr_t));
+  memset(&curr_instance.dag.prefix_info.prefix, 0, sizeof(rpl_prefix_t));
   memcpy(&curr_instance.dag.prefix_info.prefix, addr, (len + 7) / 8);
   curr_instance.dag.prefix_info.length = len;
   curr_instance.dag.prefix_info.lifetime = RPL_ROUTE_INFINITE_LIFETIME;
@@ -264,7 +262,6 @@ const struct routing_driver rpl_lite_driver = {
   rpl_link_callback,
   neighbor_state_changed,
   drop_route,
-  rpl_get_leaf_only,
 };
 /*---------------------------------------------------------------------------*/
 

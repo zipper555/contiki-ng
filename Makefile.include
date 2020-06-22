@@ -4,10 +4,6 @@ ifndef CONTIKI
   ${error CONTIKI not defined! You must specify where Contiki resides}
 endif
 
-### Include a helper Makefile that creates variables for all Contiki-NG path
-### locations.
-include $(CONTIKI)/Makefile.dir-variables
-
 # Enable Werror by default. To disable from command line, use make WERROR=0.
 # Setting this option is also important for tests on Cooja motes to check for warnings.
 WERROR ?= 1
@@ -43,11 +39,7 @@ endif
 
 BUILD_DIR = build
 BUILD_DIR_TARGET = $(BUILD_DIR)/$(TARGET)
-BUILD_DIR_TARGET_BOARD = $(BUILD_DIR_TARGET)/$(BOARD)
-# If BOARD was empty, make sure we don't end up with a sequence of slashes
-BUILD_DIR_FULL = $(BUILD_DIR_TARGET_BOARD:/=)/$(BUILD_DIR_CONFIG)
-# Ditto if BUILD_DIR_CONFIG was empty
-BUILD_DIR_BOARD = $(BUILD_DIR_FULL:/=)
+BUILD_DIR_BOARD = $(BUILD_DIR_TARGET)/$(BOARD)/$(BUILD_DIR_CONFIG)
 OBJECTDIR = $(BUILD_DIR_BOARD)/obj
 
 CONTIKI_NG_TARGET_LIB = $(BUILD_DIR_BOARD)/contiki-ng-$(TARGET).a
@@ -58,7 +50,7 @@ TARGET_UPPERCASE := ${strip ${shell echo $(TARGET) | sed y!$(LOWERCASE)!$(UPPERC
 CFLAGS += -DCONTIKI=1 -DCONTIKI_TARGET_$(TARGET_UPPERCASE)=1
 CFLAGS += -DCONTIKI_TARGET_STRING=\"$(TARGET)\"
 
-CFLAGS += -Wno-unused-const-variable
+#CFLAGS += -Wno-unused-const-variable
 
 LDFLAGS_WERROR ?= -Wl,--fatal-warnings
 
@@ -66,16 +58,14 @@ ifeq ($(WERROR),1)
  LDFLAGS += $(LDFLAGS_WERROR)
 endif
 
-MODULES += $(CONTIKI_NG_OS_DIR) $(CONTIKI_NG_ARCH_DIR)
-MODULES += $(CONTIKI_NG_SYS_DIR) $(CONTIKI_NG_LIB_DIR) $(CONTIKI_NG_DEV_DIR)
-MODULES += $(CONTIKI_NG_NET_DIR) $(CONTIKI_NG_ROUTING_DIR)
-MODULES += $(CONTIKI_NG_MAC_DIR) $(CONTIKI_NG_MAC_DIR)/framer
-MODULES += $(CONTIKI_NG_STORAGE_DIR) $(CONTIKI_NG_SERVICES_DIR)
+MODULES += os os/sys os/dev os/lib os/services
 
 # Automatically include project-conf.h if found
 ifneq ("$(wildcard project-conf.h)","")
 CFLAGS += -DPROJECT_CONF_PATH=\"project-conf.h\"
 endif
+
+MODULES += os os/net os/net/mac os/net/mac/framer os/net/routing os/storage
 
 define oname
 ${patsubst %.c,%.o, \
@@ -92,8 +82,10 @@ uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
 
 ### Include target makefile (TODO Unsafe?)
 
-target_makefile := $(wildcard $(CONTIKI_NG_RELOC_PLATFORM_DIR)/$(TARGET)/Makefile.$(TARGET) \
-                   $(foreach TDIR, $(TARGETDIRS), $(TDIR)/$(TARGET)/Makefile.$(TARGET)))
+# Configurable arch path
+ARCH_PATH ?= $(CONTIKI)/arch
+
+target_makefile := $(wildcard $(ARCH_PATH)/platform/$(TARGET)/Makefile.$(TARGET) ${foreach TDIR, $(TARGETDIRS), $(TDIR)/$(TARGET)/Makefile.$(TARGET)})
 
 # Check if the target makefile exists, and create the object directory if necessary.
 ifeq ($(strip $(target_makefile)),)
@@ -158,22 +150,22 @@ MAKE_MAC_OTHER = 4
 MAKE_MAC ?= MAKE_MAC_CSMA
 
 ifeq ($(MAKE_MAC),MAKE_MAC_NULLMAC)
-  MODULES += $(CONTIKI_NG_MAC_DIR)/nullmac
+  MODULES+=os/net/mac/nullmac
   CFLAGS += -DMAC_CONF_WITH_NULLMAC=1
 endif
 
 ifeq ($(MAKE_MAC),MAKE_MAC_CSMA)
-  MODULES += $(CONTIKI_NG_MAC_DIR)/csma
+  MODULES += os/net/mac/csma
   CFLAGS += -DMAC_CONF_WITH_CSMA=1
 endif
 
 ifeq ($(MAKE_MAC),MAKE_MAC_TSCH)
-  MODULES += $(CONTIKI_NG_MAC_DIR)/tsch
+  MODULES += os/net/mac/tsch
   CFLAGS += -DMAC_CONF_WITH_TSCH=1
 endif
 
 ifeq ($(MAKE_MAC),MAKE_MAC_BLE)
-  MODULES += $(CONTIKI_NG_MAC_DIR)/ble
+  MODULES += os/net/mac/ble
   CFLAGS += -DMAC_CONF_WITH_BLE=1
 endif
 
@@ -192,12 +184,12 @@ MAKE_NET ?= MAKE_NET_IPV6
 
 ifeq ($(MAKE_NET),MAKE_NET_NULLNET)
   CFLAGS += -DNETSTACK_CONF_WITH_NULLNET=1
-  MODULES += $(CONTIKI_NG_NET_DIR)/nullnet
+  MODULES += os/net/nullnet
 endif
 
 ifeq ($(MAKE_NET),MAKE_NET_IPV6)
   CFLAGS += -DNETSTACK_CONF_WITH_IPV6=1
-  MODULES += $(CONTIKI_NG_NET_DIR)/ipv6
+  MODULES += os/net/ipv6
 endif
 
 ifeq ($(MAKE_NET),MAKE_NET_OTHER)
@@ -205,7 +197,7 @@ ifeq ($(MAKE_NET),MAKE_NET_OTHER)
 endif
 
 ifeq ($(WITH_IP64),1)
-  MODULES += $(CONTIKI_NG_SERVICES_DIR)/ip64
+  MODULES += os/services/ip64
 endif
 
 # Configure Routing protocol
@@ -222,36 +214,29 @@ endif
 
 ifeq ($(MAKE_ROUTING),MAKE_ROUTING_RPL_CLASSIC)
   CFLAGS += -DROUTING_CONF_RPL_CLASSIC=1
-  MODULES += $(CONTIKI_NG_ROUTING_DIR)/rpl-classic
+  MODULES += os/net/routing/rpl-classic
 else ifeq ($(MAKE_ROUTING),MAKE_ROUTING_RPL_LITE)
   CFLAGS += -DROUTING_CONF_RPL_LITE=1
-  MODULES += $(CONTIKI_NG_ROUTING_DIR)/rpl-lite
+  MODULES += os/net/routing/rpl-lite
 else ifeq ($(MAKE_ROUTING),MAKE_ROUTING_NULLROUTING)
   CFLAGS += -DROUTING_CONF_NULLROUTING=1
-  MODULES += $(CONTIKI_NG_ROUTING_DIR)/nullrouting
+  MODULES += os/net/routing/nullrouting
 endif
 
-MODULEDIRS = $(MODULES_REL) ${addprefix $(CONTIKI)/, $(MODULES)}
+MODULEDIRS = $(MODULES_REL) ${wildcard ${addprefix $(CONTIKI)/, $(MODULES)}}
 UNIQUEMODULES = $(call uniq,$(MODULEDIRS))
-MODULES_SOURCES = ${foreach d, $(UNIQUEMODULES), ${subst ${d}/,,${wildcard $(d)/*.c}}}
+MODULES_SOURCES = ${foreach d, $(MODULEDIRS), ${subst ${d}/,,${wildcard $(d)/*.c}}}
 CONTIKI_SOURCEFILES += $(MODULES_SOURCES)
 
 # Include module-specific makefiles
-MODULES_INCLUDES = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/Makefile.${notdir $(d)}}}
-
-### Perform an immediate expansion of MODULES_INCLUDES and store it in a
-### variable. This will allow us to subsequently filter-out module Makefiles
-### that were included in the first pass, such that we don't end up including
-### them twice.
-MODULES_INCLUDED_FIRST_PASS := $(MODULES_INCLUDES)
-include $(MODULES_INCLUDED_FIRST_PASS)
-
+MODULES_INCLUDES = ${wildcard ${foreach d, $(MODULEDIRS), $(d)/Makefile.${notdir $(d)}}}
+include $(MODULES_INCLUDES)
 # Iterate once more: include the modules added from the previous include.
 # Only works with one level of nested module inclusion.
-include $(filter-out $(MODULES_INCLUDED_FIRST_PASS),$(MODULES_INCLUDES))
+include $(MODULES_INCLUDES)
 
 # C-include module-specific macros using -imacros
-MODULES_IMACROS = ${wildcard ${foreach d, $(UNIQUEMODULES), $(d)/module-macros.h}}
+MODULES_IMACROS = ${wildcard ${foreach d, $(MODULEDIRS), $(d)/module-macros.h}}
 ifneq ($(MODULES_IMACROS),)
   CFLAGS += ${foreach d, $(MODULES_IMACROS), -imacros $(d)}
 endif
@@ -291,9 +276,10 @@ CONTIKI_TARGET_DIRS_CONCAT = ${addprefix ${dir $(target_makefile)}, \
                                $(CONTIKI_TARGET_DIRS)}
 CONTIKI_CPU_DIRS_CONCAT    = ${addprefix $(CONTIKI_CPU)/, \
                                $(CONTIKI_CPU_DIRS)}
+CONTIKI_ARCH_DIRS    = ${addprefix $(CONTIKI)/, arch}
 
-SOURCEDIRS += . $(PROJECTDIRS) $(CONTIKI_TARGET_DIRS_CONCAT) \
-              $(CONTIKI_CPU_DIRS_CONCAT) $(MODULEDIRS) $(EXTERNALDIRS)
+SOURCEDIRS = . $(PROJECTDIRS) $(CONTIKI_TARGET_DIRS_CONCAT) $(CONTIKI_ARCH_DIRS) \
+             $(CONTIKI_CPU_DIRS_CONCAT) $(CONTIKIDIRS) $(MODULEDIRS) $(EXTERNALDIRS) ${dir $(target_makefile)}
 
 vpath %.c $(SOURCEDIRS)
 vpath %.S $(SOURCEDIRS)
@@ -343,13 +329,13 @@ clean:
 	@echo Target $(TARGET) cleaned
 
 distclean:
-	@for TARG in `ls $(CONTIKI_NG_RELOC_PLATFORM_DIR) $(TARGETDIRS)`; do \
+	@for TARG in `ls $(ARCH_PATH)/platform $(TARGETDIRS)`; do \
 		echo Running: $(MAKE) TARGET=$$TARG clean; \
 		$(MAKE) TARGET=$$TARG clean; \
 	done
 	-$(Q)rm -rf $(BUILD_DIR)
 
--include $(CONTIKI_NG_RELOC_PLATFORM_DIR)/$(TARGET)/Makefile.customrules-$(TARGET)
+-include $(ARCH_PATH)/platform/$(TARGET)/Makefile.customrules-$(TARGET)
 
 ifndef CUSTOM_RULE_C_TO_OBJECTDIR_O
 $(OBJECTDIR)/%.o: %.c | $(OBJECTDIR)
@@ -431,7 +417,7 @@ endif
 include $(CONTIKI)/Makefile.help
 
 targets:
-	@ls $(CONTIKI_NG_RELOC_PLATFORM_DIR) $(TARGETDIRS)
+	@ls $(ARCH_PATH)/platform $(TARGETDIRS)
 
 boards:
 ifdef BOARD
@@ -453,7 +439,7 @@ savedefines:
 	@echo "saving Makefile.$(TARGET).defines"
 	@echo >Makefile.$(TARGET).defines "DEFINES = $(DEFINES)"
 
-VIEWCONF = $(CONTIKI_NG_TOOLS_DIR)/viewconf/viewconf.c
+VIEWCONF = $(CONTIKI)/tools/viewconf/viewconf.c
 viewconf:
 	@echo "----------------- Make variables: --------------"
 	@echo "##### \"TARGET\": ________________________________ $(TARGET)"
@@ -478,9 +464,6 @@ endif
 ifeq ($(findstring $(TARGET),native cooja),)
   include $(CONTIKI)/Makefile.embedded
 endif
-
-### Include Makefile.gcc for GCC specific definitions and actions
-include $(CONTIKI)/Makefile.gcc
 
 # Don't treat $(BUILD_DIR_BOARD)/%.$(TARGET) and $(TARGET) as intermediate
 # files because for many platforms they are in fact the primary target.

@@ -61,12 +61,8 @@
  * discrepancy between CC13x0 and CC13x2 IEEE support. CC13x0 doesn't provide
  * RFCore definitions of IEEE commands, and are therefore included locally
  * from the Contiki build system. CC13x2 includes these normally from driverlib.
+ * This is taken care of RF settings.
  */
-#if defined(DeviceFamily_CC13X0)
-#include "driverlib/rf_ieee_mailbox.h"
-#else
-#include DeviceFamily_constructPath(driverlib/rf_ieee_mailbox.h)
-#endif
 
 #include <ti/drivers/rf/RF.h>
 /*---------------------------------------------------------------------------*/
@@ -112,19 +108,6 @@
 #define STATUS_CORRELATION   0x3f  /* bits 0-5 */
 #define STATUS_REJECT_FRAME  0x40  /* bit 6 */
 #define STATUS_CRC_FAIL      0x80  /* bit 7 */
-/*---------------------------------------------------------------------------*/
-/*
- * The number of bytes appended at the end of an outgoing frame as a footer
- * Currently fixed at 2 bytes for IEEE 802.15.4 compliance.
- */
-#define CHECKSUM_LEN 2
-
-/*
- * The maximum number of bytes this driver can accept from the MAC layer for
- * transmission or will deliver to the MAC layer after reception. Includes
- * the MAC header and payload, but not the FCS.
- */
-#define MAX_PAYLOAD_LEN (127 - CHECKSUM_LEN)
 /*---------------------------------------------------------------------------*/
 #define FRAME_FCF_OFFSET     0
 #define FRAME_SEQNUM_OFFSET  2
@@ -189,24 +172,17 @@ static ieee_radio_t ieee_radio;
 /* Global RF Core commands */
 static cmd_mod_filt_t cmd_mod_filt;
 /*---------------------------------------------------------------------------*/
-/* Convenience macros for more succinct access of RF commands */
-#define cmd_radio_setup     rf_cmd_ieee_radio_setup
-#define cmd_fs              rf_cmd_ieee_fs
-#define cmd_tx              rf_cmd_ieee_tx
-#define cmd_rx              rf_cmd_ieee_rx
-#define cmd_rx_ack          rf_cmd_ieee_rx_ack
-
-/* Convenience macros for volatile access with the RF commands */
-#define v_cmd_radio_setup   CC_ACCESS_NOW(rfc_CMD_RADIO_SETUP_t, rf_cmd_ieee_radio_setup)
-#define v_cmd_fs            CC_ACCESS_NOW(rfc_CMD_FS_t,          rf_cmd_ieee_fs)
-#define v_cmd_tx            CC_ACCESS_NOW(rfc_CMD_IEEE_TX_t,     rf_cmd_ieee_tx)
-#define v_cmd_rx            CC_ACCESS_NOW(rfc_CMD_IEEE_RX_t,     rf_cmd_ieee_rx)
-#define v_cmd_rx_ack        CC_ACCESS_NOW(rfc_CMD_IEEE_RX_ACK_t, rf_cmd_ieee_rx_ack)
+/* RF Command volatile objects */
+#define cmd_radio_setup  (*(volatile rfc_CMD_RADIO_SETUP_t *)&rf_cmd_ieee_radio_setup)
+#define cmd_fs           (*(volatile rfc_CMD_FS_t *)         &rf_cmd_ieee_fs)
+#define cmd_tx           (*(volatile rfc_CMD_IEEE_TX_t *)    &rf_cmd_ieee_tx)
+#define cmd_rx           (*(volatile rfc_CMD_IEEE_RX_t *)    &rf_cmd_ieee_rx)
+#define cmd_rx_ack       (*(volatile rfc_CMD_IEEE_RX_ACK_t *)&rf_cmd_ieee_rx_ack)
 /*---------------------------------------------------------------------------*/
 static inline bool
 rx_is_active(void)
 {
-  return v_cmd_rx.status == ACTIVE;
+  return cmd_rx.status == ACTIVE;
 }
 /*---------------------------------------------------------------------------*/
 /* Forward declarations of local functions */
@@ -244,7 +220,9 @@ init_rf_params(void)
   cmd_radio_setup.config.frontEndMode = RF_2_4_GHZ_FRONT_END_MODE;
   cmd_radio_setup.config.biasMode = RF_2_4_GHZ_BIAS_MODE;
 
-  cmd_rx.pRxQ = data_queue_init(sizeof(lensz_t));
+  data_queue_t *rx_q = data_queue_init(sizeof(lensz_t));
+
+  cmd_rx.pRxQ = rx_q;
   cmd_rx.pOutput = &ieee_radio.rx_stats;
 
 #if IEEE_MODE_PROMISCOUS
@@ -278,8 +256,8 @@ init_rf_params(void)
 
   /* Initialize address filter command */
   cmd_mod_filt.commandNo = CMD_IEEE_MOD_FILT;
-  memcpy(&(cmd_mod_filt.newFrameFiltOpt), &(cmd_rx.frameFiltOpt), sizeof(cmd_rx.frameFiltOpt));
-  memcpy(&(cmd_mod_filt.newFrameTypes), &(cmd_rx.frameTypes), sizeof(cmd_rx.frameTypes));
+  memcpy(&(cmd_mod_filt.newFrameFiltOpt), &(rf_cmd_ieee_rx.frameFiltOpt), sizeof(rf_cmd_ieee_rx.frameFiltOpt));
+  memcpy(&(cmd_mod_filt.newFrameTypes), &(rf_cmd_ieee_rx.frameTypes), sizeof(rf_cmd_ieee_rx.frameTypes));
 }
 /*---------------------------------------------------------------------------*/
 static rf_result_t
@@ -296,12 +274,12 @@ set_channel(uint8_t channel)
    * set_channel() to cause a synth calibration, since channel must be in
    * range 11-26.
    */
-  if(channel == v_cmd_rx.channel) {
+  if(channel == cmd_rx.channel) {
     /* We are already calibrated to this channel */
     return true;
   }
 
-  v_cmd_rx.channel = channel;
+  cmd_rx.channel = channel;
 
   const uint32_t new_freq = dot_15_4g_freq(channel);
   const uint16_t freq = (uint16_t)(new_freq / 1000);
@@ -310,8 +288,8 @@ set_channel(uint8_t channel)
   LOG_DBG("Set channel to %d, frequency 0x%04X.0x%04X (%lu)\n",
           (int)channel, freq, frac, new_freq);
 
-  v_cmd_fs.frequency = freq;
-  v_cmd_fs.fractFreq = frac;
+  cmd_fs.frequency = freq;
+  cmd_fs.fractFreq = frac;
 
   return netstack_sched_fs();
 }
@@ -381,10 +359,6 @@ rat_to_timestamp(const uint32_t rat_ticks)
 static int
 init(void)
 {
-  RF_Params rf_params;
-  RF_TxPowerTable_Value tx_power_value;
-  RF_Stat rf_stat;
-
   if(ieee_radio.rf_handle) {
     LOG_WARN("Radio already initialized\n");
     return RF_RESULT_OK;
@@ -396,6 +370,7 @@ init(void)
   init_rf_params();
 
   /* Init RF params and specify non-default params */
+  RF_Params rf_params;
   RF_Params_init(&rf_params);
   rf_params.nInactivityTimeout = RF_CONF_INACTIVITY_TIMEOUT;
 
@@ -408,17 +383,8 @@ init(void)
 
   set_channel(DOT_15_4G_DEFAULT_CHAN);
 
-  tx_power_value = RF_TxPowerTable_findValue(rf_tx_power_table, RF_TXPOWER_DBM);
-  if(tx_power_value.rawValue != RF_TxPowerTable_INVALID_VALUE) {
-    rf_stat = RF_setTxPower(ieee_radio.rf_handle, tx_power_value);
-    if(rf_stat == RF_StatSuccess) {
-      LOG_INFO("TX power configured to %d dBm\n", RF_TXPOWER_DBM);
-    } else {
-      LOG_WARN("Setting TX power to %d dBm failed, stat=0x%02X", RF_TXPOWER_DBM, rf_stat);
-    }
-  } else {
-    LOG_WARN("Unable to find TX power %d dBm in the TX power table\n", RF_TXPOWER_DBM);
-  }
+  int8_t max_tx_power = tx_power_max(rf_tx_power_table, rf_tx_power_table_size);
+  rf_set_tx_power(ieee_radio.rf_handle, rf_tx_power_table, max_tx_power);
 
   ENERGEST_ON(ENERGEST_TYPE_LISTEN);
 
@@ -436,10 +402,10 @@ init(void)
 static int
 prepare(const void *payload, unsigned short payload_len)
 {
-  if(payload_len > TX_BUF_SIZE || payload_len > MAX_PAYLOAD_LEN) {
-    return RADIO_TX_ERR;
-  }
-  memcpy(ieee_radio.tx_buf, payload, payload_len);
+  const size_t len = MIN((size_t)payload_len,
+                         (size_t)TX_BUF_SIZE);
+
+  memcpy(ieee_radio.tx_buf, payload, len);
   return 0;
 }
 /*---------------------------------------------------------------------------*/
@@ -447,11 +413,6 @@ static int
 transmit(unsigned short transmit_len)
 {
   rf_result_t res;
-
-  if(transmit_len > MAX_PAYLOAD_LEN) {
-    LOG_ERR("Too long\n");
-    return RADIO_TX_ERR;
-  }
 
   if(ieee_radio.send_on_cca && channel_clear() != 1) {
     LOG_WARN("Channel is not clear for transmission\n");
@@ -465,20 +426,20 @@ transmit(unsigned short transmit_len)
   const bool ack_request = (bool)(ieee_radio.tx_buf[FRAME_FCF_OFFSET] & FRAME_ACK_REQUEST);
   if(ack_request) {
     /* Yes, turn on chaining */
-    v_cmd_tx.condition.rule = COND_STOP_ON_FALSE;
+    cmd_tx.condition.rule = COND_STOP_ON_FALSE;
 
     /* Reset CMD_IEEE_RX_ACK command */
-    v_cmd_rx_ack.status = IDLE;
+    cmd_rx_ack.status = IDLE;
     /* Sequence number is the third byte in the frame */
-    v_cmd_rx_ack.seqNo = ieee_radio.tx_buf[FRAME_SEQNUM_OFFSET];
+    cmd_rx_ack.seqNo = ieee_radio.tx_buf[FRAME_SEQNUM_OFFSET];
   } else {
     /* No, turn off chaining */
-    v_cmd_tx.condition.rule = COND_NEVER;
+    cmd_tx.condition.rule = COND_NEVER;
   }
 
   /* Configure TX command */
-  v_cmd_tx.payloadLen = (uint8_t)transmit_len;
-  v_cmd_tx.pPayload = ieee_radio.tx_buf;
+  cmd_tx.payloadLen = (uint8_t)transmit_len;
+  cmd_tx.pPayload = ieee_radio.tx_buf;
 
   res = netstack_sched_ieee_tx(ack_request);
 
@@ -487,7 +448,7 @@ transmit(unsigned short transmit_len)
   }
 
   if(ack_request) {
-    switch(v_cmd_rx_ack.status) {
+    switch(cmd_rx_ack.status) {
     /* CMD_IEEE_RX_ACK timed out, i.e. never received ACK */
     case IEEE_DONE_TIMEOUT: return RADIO_TX_NOACK;
     /* An ACK was received with either pending data bit set or cleared */
@@ -599,7 +560,7 @@ cca_request(cmd_cca_req_t *cmd_cca_req)
   /* RX is required to be running in order to do a CCA request */
   if(!rx_is_active()) {
     /* If RX is not pending, i.e. soon to be running, schedule the RX command */
-    if(v_cmd_rx.status != PENDING) {
+    if(cmd_rx.status != PENDING) {
       res = netstack_sched_rx(false);
       if(res != RF_RESULT_OK) {
         LOG_ERR("CCA request failed to schedule RX\n");
@@ -611,33 +572,24 @@ cca_request(cmd_cca_req_t *cmd_cca_req)
     }
 
     /* Make sure RX is running before we continue, unless we timeout and fail */
-    RTIMER_BUSYWAIT_UNTIL(rx_is_active(), TIMEOUT_ENTER_RX_WAIT);
+    RTIMER_BUSYWAIT_UNTIL(!rx_is_active(), TIMEOUT_ENTER_RX_WAIT);
 
     if(!rx_is_active()) {
-      LOG_ERR("CCA request failed to turn on RX, RX status=0x%04X\n", v_cmd_rx.status);
+      LOG_ERR("CCA request failed to turn on RX, RX status=0x%04X\n", cmd_rx.status);
       return RF_RESULT_ERROR;
     }
   }
 
   /* Perform the CCA request */
-  do {
-    memset(cmd_cca_req, 0x00, sizeof(cmd_cca_req_t));
-    cmd_cca_req->commandNo = CMD_IEEE_CCA_REQ;
-    cmd_cca_req->ccaInfo.ccaState = CCA_STATE_INVALID;
-
-    stat = RF_runImmediateCmd(ieee_radio.rf_handle, (uint32_t *)cmd_cca_req);
-
-    if(stat != RF_StatCmdDoneSuccess) {
-      LOG_ERR("CCA request command failed, stat=0x%02X\n", stat);
-      if(stop_rx) {
-        netstack_stop_rx();
-      }
-      return RF_RESULT_ERROR;
-    }
-  } while(cmd_cca_req->ccaInfo.ccaState == CCA_STATE_INVALID);
+  stat = RF_runImmediateCmd(ieee_radio.rf_handle, (uint32_t *)&cmd_cca_req);
 
   if(stop_rx) {
     netstack_stop_rx();
+  }
+
+  if(stat != RF_StatCmdDoneSuccess) {
+    LOG_ERR("CCA request command failed, stat=0x%02X\n", stat);
+    return RF_RESULT_ERROR;
   }
 
   return RF_RESULT_OK;
@@ -765,26 +717,26 @@ get_value(radio_param_t param, radio_value_t *value)
 
   /* Channel */
   case RADIO_PARAM_CHANNEL:
-    *value = (radio_value_t)v_cmd_rx.channel;
+    *value = (radio_value_t)cmd_rx.channel;
     return RADIO_RESULT_OK;
 
   /* PAN ID */
   case RADIO_PARAM_PAN_ID:
-    *value = (radio_value_t)v_cmd_rx.localPanID;
+    *value = (radio_value_t)cmd_rx.localPanID;
     return RADIO_RESULT_OK;
 
   /* 16-bit address */
   case RADIO_PARAM_16BIT_ADDR:
-    *value = (radio_value_t)v_cmd_rx.localShortAddr;
+    *value = (radio_value_t)cmd_rx.localShortAddr;
     return RADIO_RESULT_OK;
 
   /* RX mode */
   case RADIO_PARAM_RX_MODE:
     *value = 0;
-    if(v_cmd_rx.frameFiltOpt.frameFiltEn) {
+    if(cmd_rx.frameFiltOpt.frameFiltEn) {
       *value |= (radio_value_t)RADIO_RX_MODE_ADDRESS_FILTER;
     }
-    if(v_cmd_rx.frameFiltOpt.autoAckEn) {
+    if(cmd_rx.frameFiltOpt.autoAckEn) {
       *value |= (radio_value_t)RADIO_RX_MODE_AUTOACK;
     }
     if(ieee_radio.poll_mode) {
@@ -807,7 +759,7 @@ get_value(radio_param_t param, radio_value_t *value)
 
   /* CCA threshold */
   case RADIO_PARAM_CCA_THRESHOLD:
-    *value = v_cmd_rx.ccaRssiThr;
+    *value = cmd_rx.ccaRssiThr;
     return RADIO_RESULT_OK;
 
   /* RSSI */
@@ -846,10 +798,6 @@ get_value(radio_param_t param, radio_value_t *value)
     *value = (radio_value_t)ieee_radio.last.corr_lqi;
     return RADIO_RESULT_OK;
 
-  case RADIO_CONST_MAX_PAYLOAD_LEN:
-    *value = (radio_value_t)MAX_PAYLOAD_LEN;
-    return RADIO_RESULT_OK;
-
   default:
     return RADIO_RESULT_NOT_SUPPORTED;
   }
@@ -886,7 +834,7 @@ set_value(radio_param_t param, radio_value_t value)
 
   /* PAN ID */
   case RADIO_PARAM_PAN_ID:
-    v_cmd_rx.localPanID = (uint16_t)value;
+    cmd_rx.localPanID = (uint16_t)value;
     if(!ieee_radio.rf_is_on) {
       return RADIO_RESULT_OK;
     }
@@ -899,7 +847,7 @@ set_value(radio_param_t param, radio_value_t value)
 
   /* 16bit address */
   case RADIO_PARAM_16BIT_ADDR:
-    v_cmd_rx.localShortAddr = (uint16_t)value;
+    cmd_rx.localShortAddr = (uint16_t)value;
     if(!ieee_radio.rf_is_on) {
       return RADIO_RESULT_OK;
     }
@@ -918,21 +866,21 @@ set_value(radio_param_t param, radio_value_t value)
       return RADIO_RESULT_INVALID_VALUE;
     }
 
-    v_cmd_rx.frameFiltOpt.frameFiltEn = (value & RADIO_RX_MODE_ADDRESS_FILTER) != 0;
-    v_cmd_rx.frameFiltOpt.frameFiltStop = 1;
-    v_cmd_rx.frameFiltOpt.autoAckEn = (value & RADIO_RX_MODE_AUTOACK) != 0;
-    v_cmd_rx.frameFiltOpt.slottedAckEn = 0;
-    v_cmd_rx.frameFiltOpt.autoPendEn = 0;
-    v_cmd_rx.frameFiltOpt.defaultPend = 0;
-    v_cmd_rx.frameFiltOpt.bPendDataReqOnly = 0;
-    v_cmd_rx.frameFiltOpt.bPanCoord = 0;
-    v_cmd_rx.frameFiltOpt.bStrictLenFilter = 0;
+    cmd_rx.frameFiltOpt.frameFiltEn = (value & RADIO_RX_MODE_ADDRESS_FILTER) != 0;
+    cmd_rx.frameFiltOpt.frameFiltStop = 1;
+    cmd_rx.frameFiltOpt.autoAckEn = (value & RADIO_RX_MODE_AUTOACK) != 0;
+    cmd_rx.frameFiltOpt.slottedAckEn = 0;
+    cmd_rx.frameFiltOpt.autoPendEn = 0;
+    cmd_rx.frameFiltOpt.defaultPend = 0;
+    cmd_rx.frameFiltOpt.bPendDataReqOnly = 0;
+    cmd_rx.frameFiltOpt.bPanCoord = 0;
+    cmd_rx.frameFiltOpt.bStrictLenFilter = 0;
 
     const bool old_poll_mode = ieee_radio.poll_mode;
     ieee_radio.poll_mode = (value & RADIO_RX_MODE_POLL_MODE) != 0;
     if(old_poll_mode == ieee_radio.poll_mode) {
       /* Do not turn the radio off and on, just send an update command */
-      memcpy(&cmd_mod_filt.newFrameFiltOpt, &(cmd_rx.frameFiltOpt), sizeof(cmd_rx.frameFiltOpt));
+      memcpy(&cmd_mod_filt.newFrameFiltOpt, &(rf_cmd_ieee_rx.frameFiltOpt), sizeof(rf_cmd_ieee_rx.frameFiltOpt));
       const RF_Stat stat = RF_runImmediateCmd(ieee_radio.rf_handle, (uint32_t *)&cmd_mod_filt);
       if(stat != RF_StatCmdDoneSuccess) {
         LOG_ERR("Setting address filter failed, stat=0x%02X\n", stat);
@@ -971,7 +919,7 @@ set_value(radio_param_t param, radio_value_t value)
 
   /* CCA Threshold */
   case RADIO_PARAM_CCA_THRESHOLD:
-    v_cmd_rx.ccaRssiThr = (int8_t)value;
+    cmd_rx.ccaRssiThr = (int8_t)value;
     if(!ieee_radio.rf_is_on) {
       return RADIO_RESULT_OK;
     }
@@ -997,12 +945,12 @@ get_object(radio_param_t param, void *dest, size_t size)
   switch(param) {
   /* 64bit address */
   case RADIO_PARAM_64BIT_ADDR: {
-    const size_t srcSize = sizeof(v_cmd_rx.localExtAddr);
+    const size_t srcSize = sizeof(cmd_rx.localExtAddr);
     if(size != srcSize) {
       return RADIO_RESULT_INVALID_VALUE;
     }
 
-    const uint8_t *pSrc = (uint8_t *)&(v_cmd_rx.localExtAddr);
+    const uint8_t *pSrc = (uint8_t *)&(cmd_rx.localExtAddr);
     uint8_t *pDest = dest;
     for(size_t i = 0; i < srcSize; ++i) {
       pDest[i] = pSrc[srcSize - 1 - i];
@@ -1037,13 +985,13 @@ set_object(radio_param_t param, const void *src, size_t size)
   switch(param) {
   /* 64-bit address */
   case RADIO_PARAM_64BIT_ADDR: {
-    const size_t destSize = sizeof(v_cmd_rx.localExtAddr);
+    const size_t destSize = sizeof(cmd_rx.localExtAddr);
     if(size != destSize) {
       return RADIO_RESULT_INVALID_VALUE;
     }
 
     const uint8_t *pSrc = (const uint8_t *)src;
-    volatile uint8_t *pDest = (uint8_t *)&(v_cmd_rx.localExtAddr);
+    volatile uint8_t *pDest = (uint8_t *)&(cmd_rx.localExtAddr);
     for(size_t i = 0; i < destSize; ++i) {
       pDest[i] = pSrc[destSize - 1 - i];
     }

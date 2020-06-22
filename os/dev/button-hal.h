@@ -151,11 +151,6 @@ struct button_hal_button_s {
   /** True if the button uses negative logic (active: low) */
   const bool negative_logic;
 
-#if GPIO_HAL_PORT_PIN_NUMBERING
-  /** The gpio port connected to the button */
-  gpio_hal_port_t port;
-#endif
-
   /** The gpio pin connected to the button */
   const gpio_hal_pin_t pin;
 
@@ -177,36 +172,23 @@ struct button_hal_button_s {
 };
 /*---------------------------------------------------------------------------*/
 #if BUTTON_HAL_WITH_DESCRIPTION
-#if GPIO_HAL_PORT_PIN_NUMBERING
 /**
  * \brief Define a button to be used by the HAL
  * \param name The variable name for the button
  * \param descr A textual description
- * \param po The port connected to the button
- * \param pi The pin connected to the button
+ * \param p The pin connected to the button
  * \param nl True if the button is connected using negative logic
  * \param u The button's pull configuration
  * \param id A unique numeric identifier
  */
-#define BUTTON_HAL_BUTTON(name, descr, po, pi, u, id, nl) \
+#define BUTTON_HAL_BUTTON(name, descr, p, u, id, nl) \
   static button_hal_button_t name = { \
     .description = descr, \
-    .port = po, \
-    .pin = pi, \
+    .pin = p, \
     .pull = u, \
     .unique_id = id, \
     .negative_logic = nl, \
   }
-#else /* GPIO_HAL_PORT_PIN_NUMBERING */
-#define BUTTON_HAL_BUTTON(name, descr, pi, u, id, nl) \
-  static button_hal_button_t name = { \
-    .description = descr, \
-    .pin = pi, \
-    .pull = u, \
-    .unique_id = id, \
-    .negative_logic = nl, \
-  }
-#endif /* GPIO_HAL_PORT_PIN_NUMBERING */
 
 /**
  * \brief Retrieve the textual description of a button
@@ -216,30 +198,17 @@ struct button_hal_button_s {
  * BUTTON_HAL_WITH_DESCRIPTION is 0 then this macro will return ""
  */
 #define BUTTON_HAL_GET_DESCRIPTION(b) (b)->description
-
-#else /* BUTTON_HAL_WITH_DESCRIPTION */
-
-#if GPIO_HAL_PORT_PIN_NUMBERING
-#define BUTTON_HAL_BUTTON(name, descr, po, pi, u, id, nl) \
+#else
+#define BUTTON_HAL_BUTTON(name, descr, p, u, id, nl) \
   static button_hal_button_t name = { \
-    .port = po, \
-    .pin = pi, \
+    .pin = p, \
     .pull = u, \
     .unique_id = id, \
     .negative_logic = nl, \
   }
-#else /* GPIO_HAL_PORT_PIN_NUMBERING */
-#define BUTTON_HAL_BUTTON(name, descr, pi, u, id, nl) \
-  static button_hal_button_t name = { \
-    .pin = pi, \
-    .pull = u, \
-    .unique_id = id, \
-    .negative_logic = nl, \
-  }
-#endif /* GPIO_HAL_PORT_PIN_NUMBERING */
 
 #define BUTTON_HAL_GET_DESCRIPTION(b) ""
-#endif /* BUTTON_HAL_WITH_DESCRIPTION */
+#endif
 /*---------------------------------------------------------------------------*/
 #define BUTTON_HAL_BUTTONS(...) \
   button_hal_button_t *button_hal_buttons[] = {__VA_ARGS__, NULL}; \

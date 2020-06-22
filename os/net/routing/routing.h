@@ -29,13 +29,6 @@
  * This file is part of the Contiki operating system.
  *
  */
-/**
- * \addtogroup net-layer
- * @{
- *
- * \defgroup routing An API for routing
- * @{
-*/
 
 /**
  * \file
@@ -126,10 +119,8 @@ struct routing_driver {
   void (* local_repair)(const char *str);
   /**
    * Removes all extension headers that pertain to the routing protocol.
-   *
-   * \return true in case of success, false otherwise
   */
-  bool (* ext_header_remove)(void);
+  void (* ext_header_remove)(void);
   /**
    * Adds/updates routing protocol extension headers to current uIP packet.
    *
@@ -182,16 +173,6 @@ struct routing_driver {
    * \param route The route that will be dropped after this function returns
    */
   void (* drop_route)(uip_ds6_route_t *route);
-  /**
-   * Tells whether the protocol is in leaf mode
-   *
-   * \retval 1 if the protocol is in leaf mode, 0 if not.
-   */
-  uint8_t (* is_in_leaf_mode)(void);
 };
 
 #endif /* ROUTING_H_ */
-/**
- * @}
- * @}
- */

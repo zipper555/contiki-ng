@@ -38,22 +38,11 @@
 
 #include "net/packetbuf.h"
 #include "net/netstack.h"
-#include "sys/energest.h"
 
 #include "dev/radio.h"
 #include "dev/cooja-radio.h"
 
-/*
- * The maximum number of bytes this driver can accept from the MAC layer for
- * transmission or will deliver to the MAC layer after reception. Includes
- * the MAC header and payload, but not the FCS.
- */
-#ifdef COOJA_RADIO_CONF_BUFSIZE
-#define COOJA_RADIO_BUFSIZE COOJA_RADIO_CONF_BUFSIZE
-#else
-#define COOJA_RADIO_BUFSIZE 125
-#endif
-
+#define COOJA_RADIO_BUFSIZE PACKETBUF_SIZE
 #define CCA_SS_THRESHOLD -95
 
 const struct simInterface radio_interface;
@@ -140,7 +129,6 @@ radio_LQI(void)
 static int
 radio_on(void)
 {
-  ENERGEST_ON(ENERGEST_TYPE_LISTEN);
   simRadioHWOn = 1;
   return 1;
 }
@@ -148,7 +136,6 @@ radio_on(void)
 static int
 radio_off(void)
 {
-  ENERGEST_OFF(ENERGEST_TYPE_LISTEN);
   simRadioHWOn = 0;
   return 1;
 }
@@ -210,9 +197,22 @@ channel_clear(void)
 static int
 radio_send(const void *payload, unsigned short payload_len)
 {
-  int result;
-  int radio_was_on = simRadioHWOn;
+  int radiostate = simRadioHWOn;
 
+  /* Simulate turnaround time of 2ms for packets, 1ms for acks*/
+#if COOJA_SIMULATE_TURNAROUND
+  simProcessRunValue = 1;
+  cooja_mt_yield();
+  if(payload_len > 3) {
+    simProcessRunValue = 1;
+    cooja_mt_yield();
+  }
+#endif /* COOJA_SIMULATE_TURNAROUND */
+
+  if(!simRadioHWOn) {
+    /* Turn on radio temporarily */
+    simRadioHWOn = 1;
+  }
   if(payload_len > COOJA_RADIO_BUFSIZE) {
     return RADIO_TX_ERR;
   }
@@ -223,55 +223,29 @@ radio_send(const void *payload, unsigned short payload_len)
     return RADIO_TX_ERR;
   }
 
-  if(radio_was_on) {
-    ENERGEST_SWITCH(ENERGEST_TYPE_LISTEN, ENERGEST_TYPE_TRANSMIT);
-  } else {
-    /* Turn on radio temporarily */
-    simRadioHWOn = 1;
-    ENERGEST_ON(ENERGEST_TYPE_TRANSMIT);
+  /* Transmit on CCA */
+#if COOJA_TRANSMIT_ON_CCA
+  if(send_on_cca && !channel_clear()) {
+    return RADIO_TX_COLLISION;
   }
+#endif /* COOJA_TRANSMIT_ON_CCA */
 
-#if COOJA_SIMULATE_TURNAROUND
-  simProcessRunValue = 1;
-  cooja_mt_yield();
-  if(payload_len > 3) {
-    simProcessRunValue = 1;
+  /* Copy packet data to temporary storage */
+  memcpy(simOutDataBuffer, payload, payload_len);
+  simOutSize = payload_len;
+
+  /* Transmit */
+  while(simOutSize > 0) {
     cooja_mt_yield();
   }
-#endif /* COOJA_SIMULATE_TURNAROUND */
 
-  /* Transmit on CCA */
-  if(COOJA_TRANSMIT_ON_CCA && send_on_cca && !channel_clear()) {
-    result = RADIO_TX_COLLISION;
-  } else {
-    /* Copy packet data to temporary storage */
-    memcpy(simOutDataBuffer, payload, payload_len);
-    simOutSize = payload_len;
-
-    /* Transmit */
-    while(simOutSize > 0) {
-      cooja_mt_yield();
-    }
-
-    result = RADIO_TX_OK;
-  }
-
-  if(radio_was_on) {
-    ENERGEST_SWITCH(ENERGEST_TYPE_TRANSMIT, ENERGEST_TYPE_LISTEN);
-  } else {
-    ENERGEST_OFF(ENERGEST_TYPE_TRANSMIT);
-  }
-
-  simRadioHWOn = radio_was_on;
-  return result;
+  simRadioHWOn = radiostate;
+  return RADIO_TX_OK;
 }
 /*---------------------------------------------------------------------------*/
 static int
 prepare_packet(const void *data, unsigned short len)
 {
-  if(len > COOJA_RADIO_BUFSIZE) {
-    return RADIO_TX_ERR;
-  }
   pending_data = data;
   return 0;
 }
@@ -359,9 +333,6 @@ get_value(radio_param_t param, radio_value_t *value)
   case RADIO_PARAM_RSSI:
     /* return a fixed value depending on the channel */
     *value = -90 + simRadioChannel - 11;
-    return RADIO_RESULT_OK;
-  case RADIO_CONST_MAX_PAYLOAD_LEN:
-    *value = (radio_value_t)COOJA_RADIO_BUFSIZE;
     return RADIO_RESULT_OK;
   default:
     return RADIO_RESULT_NOT_SUPPORTED;

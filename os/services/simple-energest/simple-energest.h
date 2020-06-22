@@ -28,11 +28,8 @@
  *
  */
 
-/**
- * \addtogroup lib
- * @{
- *
- * \defgroup simple-energest The Simple Energest module
+ /**
+ * \addtogroup simple-energest
  * @{
  */
 
@@ -60,7 +57,4 @@
 void simple_energest_init(void);
 
 #endif /* SIMPLE_ENERGEST_H_ */
-/**
- * @}
- * @}
- */
+/** @} */

@@ -9,9 +9,7 @@ CONTIKI=../../..
 MAKE_WITH_SECURITY ?= 0 # force Security from command line
 
 MAKE_MAC = MAKE_MAC_TSCH
-
-include $(CONTIKI)/Makefile.dir-variables
-MODULES += $(CONTIKI_NG_MAC_DIR)/tsch/sixtop
+MODULES += os/net/mac/tsch/sixtop
 
 ifeq ($(MAKE_WITH_SECURITY),1)
 CFLAGS += -DWITH_SECURITY=1

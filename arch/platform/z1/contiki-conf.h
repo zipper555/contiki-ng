@@ -38,18 +38,19 @@
 /* This does not work in Cooja. */
 #define UART0_CONF_RX_WITH_DMA       0
 
-/* Handle 8 neighbors */
+/* Handle 10 neighbors */
 #ifndef NBR_TABLE_CONF_MAX_NEIGHBORS
-#define NBR_TABLE_CONF_MAX_NEIGHBORS    8
+#define NBR_TABLE_CONF_MAX_NEIGHBORS    10
 #endif
 
-/* Handle 8 routes    */
+/* Handle 10 routes    */
 #ifndef NETSTACK_MAX_ROUTE_ENTRIES
-#define NETSTACK_MAX_ROUTE_ENTRIES      8
+#define NETSTACK_MAX_ROUTE_ENTRIES      10
 #endif
 
-#ifndef UIP_CONF_UDP_CONNS
-#define UIP_CONF_UDP_CONNS 2
+/* Handle 10 links    */
+#ifndef TSCH_SCHEDULE_CONF_MAX_LINKS
+#define TSCH_SCHEDULE_CONF_MAX_LINKS    10
 #endif
 
 #ifndef TSCH_CONF_MAX_INCOMING_PACKETS
@@ -58,10 +59,6 @@
 
 #ifndef TSCH_QUEUE_CONF_NUM_PER_NEIGHBOR
 #define TSCH_QUEUE_CONF_NUM_PER_NEIGHBOR  4
-#endif
-
-#ifndef TSCH_LOG_CONF_QUEUE_LEN
-#define TSCH_LOG_CONF_QUEUE_LEN 4
 #endif
 
 /* Platform-specific (H/W) AES implementation */

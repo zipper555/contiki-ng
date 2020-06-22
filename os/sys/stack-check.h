@@ -105,7 +105,7 @@ void stack_check_init(void);
  *             has been completely used, but it cannot detect
  *             and warn if stack overflow has already taken place.
  */
-int32_t stack_check_get_usage(void);
+uint16_t stack_check_get_usage(void);
 
 /**
  * \brief      Calculate the maximal permitted stack usage.
@@ -113,7 +113,7 @@ int32_t stack_check_get_usage(void);
  *             This function returns the number of bytes between the origin
  *             of the stack and the end of heap.
  */
-int32_t stack_check_get_reserved_size(void);
+uint16_t stack_check_get_reserved_size(void);
 
 /**
  * \brief      The origin point from which the stack grows (an optional #define)

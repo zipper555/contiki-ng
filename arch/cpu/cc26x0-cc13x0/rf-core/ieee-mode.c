@@ -181,19 +181,6 @@ static rfc_CMD_IEEE_MOD_FILT_t filter_cmd;
  */
 static uint8_t cmd_ieee_rx_buf[RF_CMD_BUFFER_SIZE] CC_ALIGN(4);
 /*---------------------------------------------------------------------------*/
-/*
- * The number of bytes appended at the end of an outgoing frame as a footer
- * Currently fixed at 2 bytes for IEEE 802.15.4 compliance.
- */
-#define CHECKSUM_LEN 2
-
-/*
- * The maximum number of bytes this driver can accept from the MAC layer for
- * transmission or will deliver to the MAC layer after reception. Includes
- * the MAC header and payload, but not the FCS.
- */
-#define MAX_PAYLOAD_LEN (127 - CHECKSUM_LEN)
-/*---------------------------------------------------------------------------*/
 #define DATA_ENTRY_LENSZ_NONE 0
 #define DATA_ENTRY_LENSZ_BYTE 1
 #define DATA_ENTRY_LENSZ_WORD 2 /* 2 bytes */
@@ -211,7 +198,7 @@ static uint8_t cmd_ieee_rx_buf[RF_CMD_BUFFER_SIZE] CC_ALIGN(4);
 #define RX_BUF_DATA_OFFSET (RX_BUF_LENGTH_OFFSET + 1)
 
 #define RX_BUF_SIZE (RX_BUF_DATA_OFFSET \
-      + MAX_PAYLOAD_LEN  \
+      + NETSTACK_RADIO_MAX_PAYLOAD_LEN  \
       + RX_BUF_METADATA_SIZE)
 
 /* Four receive buffers entries with room for 1 IEEE802.15.4 frame in each */
@@ -780,11 +767,9 @@ init(void)
 static int
 prepare(const void *payload, unsigned short payload_len)
 {
-  if(payload_len > TX_BUF_PAYLOAD_LEN || payload_len > MAX_PAYLOAD_LEN) {
-    return RADIO_TX_ERR;
-  }
+  int len = MIN(payload_len, TX_BUF_PAYLOAD_LEN);
 
-  memcpy(&tx_buf[TX_BUF_HDR_LEN], payload, payload_len);
+  memcpy(&tx_buf[TX_BUF_HDR_LEN], payload, len);
   return 0;
 }
 /*---------------------------------------------------------------------------*/
@@ -798,11 +783,6 @@ transmit(unsigned short transmit_len)
   uint8_t tx_active = 0;
   rtimer_clock_t t0;
   volatile rfc_CMD_IEEE_TX_t cmd;
-
-  if(transmit_len > MAX_PAYLOAD_LEN) {
-    PRINTF("transmit: too long\n");
-    return RADIO_TX_ERR;
-  }
 
   if(!rf_is_on()) {
     was_off = 1;
@@ -1295,9 +1275,6 @@ get_value(radio_param_t param, radio_value_t *value)
     return RADIO_RESULT_OK;
   case RADIO_CONST_DELAY_BEFORE_DETECT:
     *value = (radio_value_t)RADIO_DELAY_BEFORE_DETECT;
-    return RADIO_RESULT_OK;
-  case RADIO_CONST_MAX_PAYLOAD_LEN:
-    *value = (radio_value_t)MAX_PAYLOAD_LEN;
     return RADIO_RESULT_OK;
   default:
     return RADIO_RESULT_NOT_SUPPORTED;

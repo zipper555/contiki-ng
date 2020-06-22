@@ -9,9 +9,8 @@ CONTIKI=../../../../../..
 
 MODULES_REL += ..
 MAKE_MAC = MAKE_MAC_TSCH
-include $(CONTIKI)/Makefile.dir-variables
-MODULES += $(CONTIKI_NG_APP_LAYER_DIR)/coap
-MODULES += $(CONTIKI_NG_SERVICES_DIR)/orchestra $(CONTIKI_NG_LIB_DIR)/json
+MODULES += os/net/app-layer/coap
+MODULES += os/services/orchestra os/lib/json
 
 all: $(CONTIKI_PROJECT)
 

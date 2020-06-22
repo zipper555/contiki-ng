@@ -19,8 +19,7 @@ CFLAGS += -DCOAP_OBSERVE_CLIENT=1
 MODULES_REL += ./resources
 
 # REST Engine shall use Erbium CoAP implementation
-include $(CONTIKI)/Makefile.dir-variables
-MODULES += $(CONTIKI_NG_APP_LAYER_DIR)/coap
+MODULES += os/net/app-layer/coap
 
 MAKE_ROUTING = MAKE_ROUTING_NULLROUTING
 

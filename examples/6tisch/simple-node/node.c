@@ -60,8 +60,12 @@ PROCESS_THREAD(node_process, ev, data)
 
   is_coordinator = 0;
 
-#if CONTIKI_TARGET_COOJA || CONTIKI_TARGET_Z1
+/* Private change to bringup coordinator in Zoul */
+#if CONTIKI_TARGET_COOJA || CONTIKI_TARGET_Z1 || CONTIKI_TARGET_ZOUL
   is_coordinator = (node_id == 1);
+  if (is_coordinator) {
+  	PRINTF("Starting as coordinator\n");
+  }
 #endif
 
   if(is_coordinator) {
@@ -73,8 +77,9 @@ PROCESS_THREAD(node_process, ev, data)
   {
     static struct etimer et;
     /* Print out routing tables every minute */
-    etimer_set(&et, CLOCK_SECOND * 60);
+    etimer_set(&et, CLOCK_SECOND * 30);
     while(1) {
+      tsch_schedule_print();
       /* Used for non-regression testing */
       #if (UIP_MAX_ROUTES != 0)
         PRINTF("Routing entries: %u\n", uip_ds6_route_num_routes());

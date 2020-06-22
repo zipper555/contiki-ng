@@ -44,12 +44,10 @@
 #include "sys/rtimer.h"
 #include "sys/node-id.h"
 #include "sys/platform.h"
-#include "sys/energest.h"
 #include "dev/button-hal.h"
 #include "dev/gpio-hal.h"
 #include "dev/serial-line.h"
 #include "dev/leds.h"
-#include "dev/watchdog.h"
 #include "net/mac/framer/frame802154.h"
 #include "lib/random.h"
 #include "lib/sensors.h"
@@ -73,7 +71,6 @@
 #include <ti/drivers/UART.h>
 /*---------------------------------------------------------------------------*/
 #include "board-peripherals.h"
-#include "clock-arch.h"
 #include "uart0-arch.h"
 #include "trng-arch.h"
 /*---------------------------------------------------------------------------*/
@@ -269,25 +266,8 @@ platform_init_stage_three(void)
 void
 platform_idle(void)
 {
-  /* Clear the Watchdog before we potentially go to some low power mode */
-  watchdog_periodic();
-  /*
-   * Arm the wakeup clock. If it returns false, some timers already expired
-   * and we shouldn't go to low-power yet.
-   */
-  if(clock_arch_enter_idle()) {
-    /* Drop to some low power mode */
-    ENERGEST_SWITCH(ENERGEST_TYPE_CPU, ENERGEST_TYPE_LPM);
-    Power_idleFunc();
-    /*
-     * Clear the Watchdog immediately after wakeup, as the wakeup reason could
-     * be to clear the watchdog. See the implementation of
-     * clock_arch_set_wakeup() for why this might be the case.
-     */
-    watchdog_periodic();
-    ENERGEST_SWITCH(ENERGEST_TYPE_LPM, ENERGEST_TYPE_CPU);
-    clock_arch_exit_idle();
-  }
+  /* Drop to some low power mode */
+  Power_idleFunc();
 }
 /*---------------------------------------------------------------------------*/
 /**

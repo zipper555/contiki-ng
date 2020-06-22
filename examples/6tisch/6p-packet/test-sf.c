@@ -827,6 +827,5 @@ const sixtop_sf_t test_sf = {
   TEST_SF_TIMEOUT,
   init,
   input,
-  timeout,
-  NULL
+  timeout
 };

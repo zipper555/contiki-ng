@@ -50,7 +50,6 @@
 
 #include "net/queuebuf.h"
 #include "net/app-layer/coap/coap-engine.h"
-#include "net/app-layer/snmp/snmp.h"
 #include "services/rpl-border-router/rpl-border-router.h"
 #include "services/orchestra/orchestra.h"
 #include "services/shell/serial-shell.h"
@@ -98,11 +97,6 @@ main(void)
   node_id_init();
 
   LOG_INFO("Starting " CONTIKI_VERSION_STRING "\n");
-  LOG_DBG("TARGET=%s", CONTIKI_TARGET_STRING);
-#ifdef CONTIKI_BOARD_STRING
-  LOG_DBG_(", BOARD=%s", CONTIKI_BOARD_STRING);
-#endif
-  LOG_DBG_("\n");
   LOG_INFO("- Routing: %s\n", NETSTACK_ROUTING.name);
   LOG_INFO("- Net: %s\n", NETSTACK_NETWORK.name);
   LOG_INFO("- MAC: %s\n", NETSTACK_MAC.name);
@@ -152,11 +146,6 @@ main(void)
   coap_engine_init();
   LOG_DBG("With CoAP\n");
 #endif /* BUILD_WITH_SHELL */
-
-#if BUILD_WITH_SNMP
-  snmp_init();
-  LOG_DBG("With SNMP\n");
-#endif /* BUILD_WITH_SNMP */
 
 #if BUILD_WITH_SIMPLE_ENERGEST
   simple_energest_init();

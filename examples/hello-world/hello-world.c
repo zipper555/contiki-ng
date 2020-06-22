@@ -38,29 +38,44 @@
  */
 
 #include "contiki.h"
+#include "dev/leds.h"
+#include "dev/serial-line.h"
 
 #include <stdio.h> /* For printf() */
 /*---------------------------------------------------------------------------*/
 PROCESS(hello_world_process, "Hello world process");
-AUTOSTART_PROCESSES(&hello_world_process);
+PROCESS(serial_process, "Serial process");
+AUTOSTART_PROCESSES(&hello_world_process, &serial_process);
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(hello_world_process, ev, data)
 {
-  static struct etimer timer;
-
   PROCESS_BEGIN();
-
-  /* Setup a periodic timer that expires after 10 seconds. */
-  etimer_set(&timer, CLOCK_SECOND * 10);
-
-  while(1) {
-    printf("Hello, world\n");
-
-    /* Wait for the periodic timer to expire and then restart the timer. */
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer));
-    etimer_reset(&timer);
+  static struct etimer timerGreen;
+  printf("Hello, world\n");
+  etimer_set(&timerGreen, CLOCK_SECOND/2);
+  while (1) {
+	PROCESS_WAIT_EVENT();
+	if(etimer_expired(&timerGreen)) {
+//			printf("Timer expired for GREEN...\r\n");
+			leds_toggle(LEDS_GREEN);
+			etimer_reset(&timerGreen);
+		}
   }
-
+  
   PROCESS_END();
 }
 /*---------------------------------------------------------------------------*/
+
+PROCESS_THREAD(serial_process, ev, data)
+{
+        PROCESS_BEGIN();
+
+        while(1) {
+                PROCESS_YIELD();
+                if (ev == serial_line_event_message) {
+                        printf("\n\nData is %s\n\n", (char*)data);
+                }
+        }
+        PROCESS_END();
+}
+

@@ -29,17 +29,6 @@
  * This file is part of the Contiki operating system.
  *
  */
-/**
-* \addtogroup lib
-* @{
-*
-* \defgroup shell Contiki-NG interactive management shell
-*
-* The shell enables to inspect and manage the network layer and provides
-* other system functionalities
-*
-* @{
-*/
 
 /**
  * \file
@@ -47,6 +36,10 @@
  * \author
  *         Simon Duquennoy <simon.duquennoy@inria.fr>
  */
+
+/** \addtogroup apps
+ * @{ */
+
 #ifndef SHELL_H_
 #define SHELL_H_
 
@@ -111,7 +104,5 @@ void shell_output_6addr(shell_output_func output, const uip_ipaddr_t *ipaddr);
 void shell_output_lladdr(shell_output_func output, const linkaddr_t *lladdr);
 
 #endif /* SHELL_H_ */
-/**
- * @}
- * @}
- */
+
+/** @} */

@@ -48,6 +48,9 @@
 /******************* Configure TSCH ********************/
 /*******************************************************/
 
+/* Schedule in EB */
+#define TSCH_PACKET_CONF_EB_WITH_SLOTFRAME_AND_LINK 1
+
 /* IEEE802.15.4 PANID */
 #define IEEE802154_CONF_PANID 0x81a5
 
@@ -75,7 +78,8 @@
 #define LOG_CONF_LEVEL_IPV6                        LOG_LEVEL_WARN
 #define LOG_CONF_LEVEL_6LOWPAN                     LOG_LEVEL_WARN
 #define LOG_CONF_LEVEL_MAC                         LOG_LEVEL_INFO
-#define LOG_CONF_LEVEL_FRAMER                      LOG_LEVEL_WARN
+#define LOG_CONF_LEVEL_FRAMER                      LOG_LEVEL_INFO
 #define TSCH_LOG_CONF_PER_SLOT                     1
+#define WITH_PERIODIC_ROUTES_PRINT                 1
 
 #endif /* PROJECT_CONF_H_ */

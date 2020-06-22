@@ -51,6 +51,8 @@
 #include "net/netstack.h"
 #include "lib/ccm-star.h"
 #include "lib/aes-128.h"
+//#include "net/mac/tsch/dyn_sched.h"
+#include "../os/services/dynsched/infra/dyn_sched.h"
 
 /* Log configuration */
 #include "sys/log.h"
@@ -74,11 +76,11 @@ static struct packetbuf_attr eackbuf_attrs[PACKETBUF_NUM_ATTRS];
 #define IEEE802154_FRAME_PENDING_BIT_OFFSET 4
 
 /*---------------------------------------------------------------------------*/
-void
+static int
 tsch_packet_eackbuf_set_attr(uint8_t type, const packetbuf_attr_t val)
 {
   eackbuf_attrs[type].val = val;
-  return;
+  return 1;
 }
 /*---------------------------------------------------------------------------*/
 /* Return the value of a specified attribute */
@@ -124,7 +126,14 @@ tsch_packet_create_eack(uint8_t *buf, uint16_t buf_len,
 #endif
 
 #if LLSEC802154_ENABLED
-  tsch_security_set_packetbuf_attr(FRAME802154_ACKFRAME);
+  if(tsch_is_pan_secured) {
+    tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_SECURITY_LEVEL,
+                                 TSCH_SECURITY_KEY_SEC_LEVEL_ACK);
+    tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_KEY_ID_MODE,
+                                 FRAME802154_1_BYTE_KEY_ID_MODE);
+    tsch_packet_eackbuf_set_attr(PACKETBUF_ATTR_KEY_INDEX,
+                                 TSCH_SECURITY_KEY_INDEX_ACK);
+  }
 #endif /* LLSEC802154_ENABLED */
 
   framer_802154_setup_params(tsch_packet_eackbuf_attr, 0, &params);
@@ -253,9 +262,9 @@ tsch_packet_create_eb(uint8_t *hdr_len, uint8_t *tsch_sync_ie_offset)
   /* Add Slotframe and Link IE */
 #if TSCH_PACKET_EB_WITH_SLOTFRAME_AND_LINK
   {
-    /* Send slotframe 0 with link at timeslot 0 and channel offset 0 */
+    /* Send slotframe 0 with link at timeslot 0 */
     struct tsch_slotframe *sf0 = tsch_schedule_get_slotframe_by_handle(0);
-    struct tsch_link *link0 = tsch_schedule_get_link_by_timeslot(sf0, 0, 0);
+    struct tsch_link *link0 = tsch_schedule_get_link_by_timeslot(sf0, 0);
     if(sf0 && link0) {
       ies.ie_tsch_slotframe_and_link.num_slotframes = 1;
       ies.ie_tsch_slotframe_and_link.slotframe_handle = sf0->handle;
@@ -269,6 +278,14 @@ tsch_packet_create_eb(uint8_t *hdr_len, uint8_t *tsch_sync_ie_offset)
     }
   }
 #endif /* TSCH_PACKET_EB_WITH_SLOTFRAME_AND_LINK */
+
+
+  /* Add Slotframe and Links IE for Dynamic scheduling*/
+#if DYNSCHED_TSCH_PACKET_EB_WITH_SLOTFRAME_AND_LINK
+  {
+	dynsched_create_ies_sf_and_link(&ies);
+  }
+#endif /* DYNSCHED_TSCH_PACKET_EB_WITH_SLOTFRAME_AND_LINK */
 
   p = packetbuf_dataptr();
 
@@ -349,7 +366,14 @@ tsch_packet_create_eb(uint8_t *hdr_len, uint8_t *tsch_sync_ie_offset)
   packetbuf_set_addr(PACKETBUF_ADDR_RECEIVER, &tsch_eb_address);
 
 #if LLSEC802154_ENABLED
-  tsch_security_set_packetbuf_attr(FRAME802154_BEACONFRAME);
+  if(tsch_is_pan_secured) {
+    packetbuf_set_attr(PACKETBUF_ATTR_SECURITY_LEVEL,
+                       TSCH_SECURITY_KEY_SEC_LEVEL_EB);
+    packetbuf_set_attr(PACKETBUF_ATTR_KEY_ID_MODE,
+                       FRAME802154_1_BYTE_KEY_ID_MODE);
+    packetbuf_set_attr(PACKETBUF_ATTR_KEY_INDEX,
+                       TSCH_SECURITY_KEY_INDEX_EB);
+  }
 #endif /* LLSEC802154_ENABLED */
 
   if(NETSTACK_FRAMER.create() < 0) {
@@ -402,8 +426,7 @@ tsch_packet_parse_eb(const uint8_t *buf, int buf_size,
 
   if(frame->fcf.frame_version < FRAME802154_IEEE802154_2015
      || frame->fcf.frame_type != FRAME802154_BEACONFRAME) {
-    LOG_INFO("! parse_eb: frame is not a TSCH beacon." \
-           " Frame version %u, type %u, FCF %02x %02x\n",
+    LOG_INFO("! parse_eb: frame is not a valid TSCH beacon. Frame version %u, type %u, FCF %02x %02x\n",
            frame->fcf.frame_version, frame->fcf.frame_type, buf[0], buf[1]);
     LOG_INFO("! parse_eb: frame was from 0x%x/", frame->src_pid);
     LOG_INFO_LLADDR((const linkaddr_t *)&frame->src_addr);

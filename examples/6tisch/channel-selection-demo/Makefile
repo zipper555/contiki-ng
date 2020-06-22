@@ -6,10 +6,8 @@ CONTIKI=../../..
 PLATFORMS_EXCLUDE = sky z1 nrf52dk native
 BOARDS_EXCLUDE = srf06/cc13x0 launchpad/cc1310 launchpad/cc1350 sensortag/cc2650 sensortag/cc1350
 
-include $(CONTIKI)/Makefile.dir-variables
-
 # The channel selection library
-MODULES += $(CONTIKI_NG_SERVICES_DIR)/tsch-cs
+MODULES += os/services/tsch-cs
 
 # force Orchestra from command line
 MAKE_WITH_ORCHESTRA ?= 0
@@ -19,10 +17,10 @@ MAKE_WITH_SECURITY ?= 0
 MAKE_WITH_PERIODIC_ROUTES_PRINT ?= 0
 
 MAKE_MAC = MAKE_MAC_TSCH
-MODULES += $(CONTIKI_NG_SERVICES_DIR)/shell
+MODULES += os/services/shell
 
 ifeq ($(MAKE_WITH_ORCHESTRA),1)
-MODULES += $(CONTIKI_NG_SERVICES_DIR)/orchestra
+MODULES += os/services/orchestra
 endif
 
 ifeq ($(MAKE_WITH_SECURITY),1)

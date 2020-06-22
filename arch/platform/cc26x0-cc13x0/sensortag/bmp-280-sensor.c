@@ -88,6 +88,7 @@
 /*---------------------------------------------------------------------------*/
 /* Misc. */
 #define MEAS_DATA_SIZE                      6
+#define CALIB_DATA_SIZE                     24
 /*---------------------------------------------------------------------------*/
 #define RES_OFF                             0
 #define RES_ULTRA_LOW_POWER                 1
@@ -119,8 +120,8 @@ typedef struct bmp_280_calibration {
   int16_t dig_p9;
   int32_t t_fine;
 } bmp_280_calibration_t;
-
-static bmp_280_calibration_t calibration_data;
+/*---------------------------------------------------------------------------*/
+static uint8_t calibration_data[CALIB_DATA_SIZE];
 /*---------------------------------------------------------------------------*/
 #define SENSOR_STATUS_DISABLED     0
 #define SENSOR_STATUS_INITIALISED  1
@@ -164,8 +165,7 @@ init(void)
   select_on_bus();
 
   /* Read and store calibration data */
-  sensor_common_read_reg(ADDR_CALIB, (uint8_t *)&calibration_data,
-                         sizeof(calibration_data));
+  sensor_common_read_reg(ADDR_CALIB, calibration_data, CALIB_DATA_SIZE);
 
   /* Reset the sensor */
   val = VAL_RESET_EXECUTE;
@@ -227,7 +227,7 @@ static void
 convert(uint8_t *data, int32_t *temp, uint32_t *press)
 {
   int32_t utemp, upress;
-  bmp_280_calibration_t *p = &calibration_data;
+  bmp_280_calibration_t *p = (bmp_280_calibration_t *)calibration_data;
   int32_t v_x1_u32r;
   int32_t v_x2_u32r;
   int32_t temperature;

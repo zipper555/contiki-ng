@@ -101,24 +101,23 @@ rpl_print_neighbor_list(void)
     rpl_parent_t *p = nbr_table_head(rpl_parents);
     clock_time_t clock_now = clock_time();
 
-    LOG_DBG("RPL: MOP %u OCP %u rank %u dioint %u, nbr count %u\n",
+    printf("RPL: MOP %u OCP %u rank %u dioint %u, nbr count %u\n",
         default_instance->mop, default_instance->of->ocp, curr_rank, curr_dio_interval, uip_ds6_nbr_num());
     while(p != NULL) {
       const struct link_stats *stats = rpl_get_parent_link_stats(p);
-      uip_ipaddr_t *parent_addr = rpl_parent_get_ipaddr(p);
-      LOG_DBG("RPL: nbr %02x %5u, %5u => %5u -- %2u %c%c (last tx %u min ago)\n",
-          parent_addr != NULL ? parent_addr->u8[15] : 0x0,
+      printf("RPL: nbr %3u %5u, %5u => %5u -- %2u %c%c (last tx %u min ago)\n",
+          rpl_parent_get_ipaddr(p)->u8[15],
           p->rank,
           rpl_get_parent_link_metric(p),
           rpl_rank_via_parent(p),
           stats != NULL ? stats->freshness : 0,
           link_stats_is_fresh(stats) ? 'f' : ' ',
           p == default_instance->current_dag->preferred_parent ? 'p' : ' ',
-          stats != NULL ? (unsigned)((clock_now - stats->last_tx_time) / (60 * CLOCK_SECOND)) : -1u
+          (unsigned)((clock_now - stats->last_tx_time) / (60 * CLOCK_SECOND))
       );
       p = nbr_table_next(rpl_parents, p);
     }
-    LOG_DBG("RPL: end of list\n");
+    printf("RPL: end of list\n");
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -197,9 +196,6 @@ uip_ipaddr_t *
 rpl_parent_get_ipaddr(rpl_parent_t *p)
 {
   const linkaddr_t *lladdr = rpl_get_parent_lladdr(p);
-  if(lladdr == NULL) {
-    return NULL;
-  }
   return uip_ds6_nbr_ipaddr_from_lladdr((uip_lladdr_t *)lladdr);
 }
 /*---------------------------------------------------------------------------*/
@@ -557,7 +553,7 @@ rpl_set_default_route(rpl_instance_t *instance, uip_ipaddr_t *from)
   if(from != NULL) {
     LOG_DBG("Adding default route through ");
     LOG_DBG_6ADDR(from);
-    LOG_DBG_("\n");
+    LOG_DBG("\n");
     instance->def_route = uip_ds6_defrt_add(from,
         RPL_DEFAULT_ROUTE_INFINITE_LIFETIME ? 0 : RPL_LIFETIME(instance, instance->default_lifetime));
     if(instance->def_route == NULL) {
@@ -1011,28 +1007,10 @@ rpl_move_parent(rpl_dag_t *dag_src, rpl_dag_t *dag_dst, rpl_parent_t *parent)
   parent->dag = dag_dst;
 }
 /*---------------------------------------------------------------------------*/
-static rpl_dag_t *
-rpl_get_any_dag_with_parent(bool requires_parent)
-{
-  int i;
-
-  for(i = 0; i < RPL_MAX_INSTANCES; ++i) {
-    if(instance_table[i].used
-         && instance_table[i].current_dag->joined
-         && (!requires_parent || instance_table[i].current_dag->preferred_parent != NULL)) {
-      return instance_table[i].current_dag;
-    }
-  }
-  return NULL;
-}
-/*---------------------------------------------------------------------------*/
 int
 rpl_has_joined(void)
 {
-  if(rpl_dag_root_is_root()) {
-    return 1;
-  }
-  return rpl_get_any_dag_with_parent(true) != NULL;
+  return rpl_get_any_dag() != NULL;
 }
 /*---------------------------------------------------------------------------*/
 int
@@ -1072,7 +1050,14 @@ rpl_get_dag(const uip_ipaddr_t *addr)
 rpl_dag_t *
 rpl_get_any_dag(void)
 {
-  return rpl_get_any_dag_with_parent(false);
+  int i;
+
+  for(i = 0; i < RPL_MAX_INSTANCES; ++i) {
+    if(instance_table[i].used && instance_table[i].current_dag->joined) {
+      return instance_table[i].current_dag;
+    }
+  }
+  return NULL;
 }
 /*---------------------------------------------------------------------------*/
 rpl_instance_t *
@@ -1413,7 +1398,7 @@ rpl_process_parent_event(rpl_instance_t *instance, rpl_parent_t *p)
     rpl_remove_routes_by_nexthop(rpl_parent_get_ipaddr(p), p->dag);
   }
 
-  if(!acceptable_rank(p->dag, rpl_rank_via_parent(p))) {
+  if(!acceptable_rank(p->dag, p->rank)) {
     /* The candidate parent is no longer valid: the rank increase resulting
        from the choice of it as a parent would be too high. */
     LOG_WARN("Unacceptable rank %u (Current min %u, MaxRankInc %u)\n", (unsigned)p->rank,
@@ -1613,7 +1598,7 @@ rpl_process_dio(uip_ipaddr_t *from, rpl_dio_t *dio)
     }
   } else {
     if(p->rank == dio->rank) {
-      LOG_INFO("Received consistent DIO\n");
+      LOG_WARN("Received consistent DIO\n");
       if(dag->joined) {
         instance->dio_counter++;
       }
