@@ -1,6 +1,6 @@
 ## TSCH Dynamic scheduling
-Code: os/services/dynsched  
-Wiki: [Home](https://github.com/zipper555/contiki-ng/wiki)
+Code: [os/services/dynsched](https://github.com/zipper555/contiki-ng/tree/develop/os/services/dynsched)  
+Documentation: [Wiki](https://github.com/zipper555/contiki-ng/wiki)
 
 # Contiki-NG: The OS for Next Generation IoT Devices
 
